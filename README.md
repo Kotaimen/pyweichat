@@ -1,0 +1,4 @@
+pyweichat
+=========
+
+WeiChat in Python
