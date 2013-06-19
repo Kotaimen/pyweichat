@@ -68,7 +68,7 @@ def post_message_factory(data):
         scale = int(tree.find('Scale').text)
         lat = float(tree.find('Location_X').text)  # No idea why X is latitude...
         lon = float(tree.find('Location_Y').text)
-        location = (lat, lon)
+        location = (lon, lat)
         return PostLocationMessage(from_user_name, to_user_name,
                                    timestamp, message_id, location, scale)
 
