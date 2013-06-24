@@ -7,20 +7,27 @@ Weichat app
 import ast
 
 from flask import Flask, request
+from flask.ext.cache import Cache
+
 from pywc import *
 from wc_jtcx import *
 
-
-
 app = Flask(__name__)
+cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 TOKEN = '123456'
 
+
+@app.route('/')
+def root():
+    return 'ok', 200
+    
 @app.route('/raytrace', methods=['GET', 'POST'])
 def weichatapp():
     try:
         server_authentication(TOKEN, request.args)
     except AuthenticationError:
+        app.logger.error('Server authentication failed!')
         return 'Unauthorized', 401
 
     if request.method == 'GET':

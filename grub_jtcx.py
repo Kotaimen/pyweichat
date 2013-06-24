@@ -2,8 +2,11 @@
 
 """ Decode requests from http://jtcx.sh.cn (which uses mapabc api) """
 
-import requests
 import json
+import unittest
+from pprint import pprint
+
+import requests
 
 KEYS = [[0, 2, 1, 2, 8, 9, 4, 1, 7, 2, 5, 3, 9],
 [0, 3, 2, 2, 9, 5, 8, 2, 6, 8, 4, 6, 3], [1, 5, 2, 7, 1, 4, 7, 2, 4, 1, 4, 3,
@@ -140,12 +143,15 @@ KEYS = [[0, 2, 1, 2, 8, 9, 4, 1, 7, 2, 5, 3, 9],
 6], [1, 4, 7, 6, 6, 5, 7, 3, 3, 3, 4, 1, 1], [1, 8, 2, 9, 0, 3, 8, 6, 8, 3, 3,
 7, 3], [0, 2, 8, 4, 8, 5, 4, 8, 9, 5, 0, 5, 7]]
 
+
 def decode_lonlat(enLonLat):
+    """ Decode encrypted lonlat """
+    # take last 4 char and join their last to ascii bytes together
     key_pos = int(''.join(map(lambda x: bin(ord(x))[-2:],
                               list(reversed(enLonLat))[:4]
                               )), 2)
     keys = KEYS[key_pos]
-
+    
     fixed = 53 if keys[0] == 1 else 23
     nums = map(ord, enLonLat[:-4])
 
@@ -155,29 +161,60 @@ def decode_lonlat(enLonLat):
 
     lonlat = ''.join(map(chr, nums))
     return float(lonlat)
+    
+def encode_lonlat(xy):
+    keys = KEYS[0] # we don't really care about encryption here...
+    assert keys[0] == 0
+    nums = map(ord , str(xy))
+    for i in range(len(nums)):
+        nums[i] += 23
+        nums[i] += keys[i + 1]
+    return ''.join(map(chr, nums)) + '0000'
+    
 
+class LonlatMagicTest(unittest.TestCase):
+
+    def testDecode(self):
+        self.assertAlmostEqual(decode_lonlat('hmkehuuukkILOF'), 116.397945)
+        self.assertAlmostEqual(decode_lonlat('lugtmsmoropJKJN'), 39.90816999)
+        
+    def testEncode(self):
+        self.assertAlmostEqual(decode_lonlat(encode_lonlat('116.397945')), 116.397945)
+        self.assertAlmostEqual(decode_lonlat(encode_lonlat('39.90816999')), 39.90816999)
+        
+
+def response2json(text):
+    text = text.split('{', 1)
+    data = json.loads('{' + text[1].strip()[:-1])
+    return data
+        
 def fetch_panel_list(location):
+    """ Highway panel information 
+    
+    A GIF image just like those displayed on elevation highways
+    """
     session = requests.Session()
     response = session.get('http://sis.jtcx.sh.cn/sisserver?highLight=false'\
                            '&srctype=USERPOI&eid=9070&extId=&agentId=&tempid=52&config=BESN'\
                            '&searchName=&cityCode=021&searchType=&number=100&batch=1'\
                            '&a_k=cb02363e90e02da4b5f3cc9dcc7f5cd0881012bd4ec0dbe0f2b5a87cea3602ad70431a4938633d15'\
-                           '&resType=JSON&enc=utf-8&sr=0&ctx=1271041&a_nocache=145440152562')
+                           '&resType=JSON&enc=utf-8&sr=0&ctx=1&a_nocache=')
 
-    text = response.text.split('{', 1)
-    data = json.loads('{' + text[1].strip()[:-1])
-
+    data = response2json(response.text)
+    
     ret = list()
 
     for poi in data['poilist']:
         ret.append(dict(name=poi['uxml']['INFORMATION'],
                         image='http://vms.jtcx.sh.cn:8089/VmsPic/vms/%s.gif' % poi['uxml']['INTELLIGID'],
                         location=(decode_lonlat(poi['x']), decode_lonlat(poi['y']))
-                        ))
+                   ))
     return ret
 
 
 def fetch_accident_list(location):
+    """ Traffic accident report """
+    
     session = requests.Session()
     response = session.get('http://sis.jtcx.sh.cn/sisserver?highLight=false'\
                            '&srctype=USERPOI&eid=9070&extId=&agentId=&tempid=10&config=BESN'\
@@ -185,8 +222,7 @@ def fetch_accident_list(location):
                            '&a_k=cb02363e90e02da4b5f3cc9dcc7f5cd0881012bd4ec0dbe0f2b5a87cea3602ad70431a4938633d15'\
                            '&resType=JSON&enc=utf-8&sr=0&ctx=1514703&a_nocache=345047492502')
 
-    text = response.text.split('{', 1)
-    data = json.loads('{' + text[1].strip()[:-1])
+    data = response2json(response.text)
 
     ret = list()
 
@@ -194,15 +230,55 @@ def fetch_accident_list(location):
         ret.append(dict(type=poi['type'],
                         address=poi['uxml']['LOCATION'],
                         location=(decode_lonlat(poi['x']), decode_lonlat(poi['y']))
-                        ))
+                   ))
+    return ret
+    
+def fetch_parking_list(location):
+    """ Parking space information 
+    
+    Note the offical site don't use location based query but their Mapabc 
+    provider supports actually supports it...
+    """
+    lonlat =(encode_lonlat(location[0]), encode_lonlat(location[1]))
+    print lonlat
+    session = requests.Session()    
+    response = session.get('http://sis.jtcx.sh.cn/sisserver?highLight=false'\
+                           '&srctype=USERPOI&eid=9070&extId=&agentId=&tempid=8&config=BESN'\
+                           '&cityCode=021&cenName=&searchType=&number=10&batch=1'\
+                           '&a_k=cb02363e90e02da4b5f3cc9dcc7f5cd0881012bd4ec0dbe0f2b5a87cea3602ad70431a4938633d15'\
+                           '&resType=JSON&enc=utf-8&sr=0&range=800&naviflag=0'\
+                           '&ctx=1&a_nocache=&cenX=%s&cenY=%s' \
+                           % lonlat                         
+                           )
+
+    data = response2json(response.text)
+
+    ret = list()
+
+    for poi in data['poilist']:
+        ret.append(dict(name=poi['name'],
+                        address=poi['address'],
+                        total=int(float(poi['uxml']['TOTAL_NUM'])),
+                        available=int(float(poi['uxml']['AVAILABLE_NUM'])),
+                        location=(decode_lonlat(poi['x']), decode_lonlat(poi['y']))
+                   ))
     return ret
 
 
-if __name__ == '__main__':
-#     print decode_lonlat('lugtmsmoropJKJN')
-    from pprint import pprint
-    for panel in fetch_panel_list('foo'):
-        pprint(panel)
+class JTCXFetchTest(unittest.TestCase):
 
-    for accident in fetch_accident_list('foo'):
-        pprint(accident)
+#     def testFetchPanels(self):
+#         for panel in fetch_panel_list((121.49586, 31.24031)):
+#             pprint(panel)        
+#          
+#     def testFetchAccidents(self):
+#         for accident in fetch_accident_list((121.49586, 31.24031)):
+#             pprint(accident)
+
+
+    def testFetchPakinglots(self):
+        for parking in fetch_parking_list((121.458989, 31.22085)):
+            print parking['name'], parking['available']
+            
+if __name__ == '__main__':
+    unittest.main()

@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
+""" A very hackish way to display location based Shanghai traffic data """
 import math
 import random
 
 from pywc import ReplyTextMessage, ReplyMultiMediaMessage
-from grub_jtcx import fetch_panel_list, fetch_accident_list
-
-
+from grub_jtcx import fetch_panel_list, fetch_parking_list
 
 def reply_text_message(message):
     reply = ReplyTextMessage(message.from_user_name,
@@ -30,10 +29,11 @@ def reply_location_message(message):
                       '&content=map&width=640&height=400'\
                       '&a_k=7251934c22809062229b12a6d94f26fc6680f1f91572543df145232575be06e920c44e7990ccb51d'\
                       '&showLogo=false&traffic=on&maplevel=4' % dict(lon=lon, lat=lat),
-                      'http://sis.jtcx.sh.cn/sisserver?config=WMAP&cenX=%(lon)s&cenY=%(lat)s'\
-                      '&content=map&width=640&height=960'\
-                      '&a_k=7251934c22809062229b12a6d94f26fc6680f1f91572543df145232575be06e920c44e7990ccb51d'\
-                      '&showLogo=false&traffic=on&maplevel=3' % dict(lon=lon, lat=lat),
+
+                      'http://ditu.google.cn/maps/api/staticmap?center='\
+                      '%(lat)s,%(lon)s&markers=%(lat)s,%(lon)s'\
+                      '&zoom=13&size=400x600&sensor=true&visual_refresh&scale=2&language=zh_cn' \
+                        % dict(lon=lon, lat=lat),
                       )
 
     panels = fetch_panel_list(message.location)
@@ -42,24 +42,34 @@ def reply_location_message(message):
 
     for n, panel in enumerate(panels):
         if n >= 4: break
-#         print panel
+        print panel['name'], panel['image']
         reply.add_article(u'高架：%s' % panel['name'],
                           '',
                           '',
                           panel['image']
                           )
 
-    accidents = fetch_accident_list(message.location)
+    parkings = fetch_parking_list(message.location)
     dist = lambda p: distance(p['location'], message.location)
-    accidents.sort(key=dist)
-
-    for n, accident in enumerate(accidents):
-        if n >= 3: break
-#         print panel
-        reply.add_article(u'%s（%s）' % (accident['type'], accident['address']),
+    parkings.sort(key=dist)
+    count = 0
+    for n, parking in enumerate(parkings):
+        if parking['available'] <= 1:
+            continue
+        count += 1
+        if count > 5:
+            print parking['name'], parking['location'], parking['total'], parking['available']
+            continue
+        
+        reply.add_article(u'停车场：%s（%s），车位：%d，空闲车位：%d' % \
+                          (parking['name'], parking['address'], 
+                           parking['total'], parking['available']),
                           '',
                           '',
-                          '',
+                          'http://ditu.google.cn/maps/api/staticmap?center='\
+                          '%(lat)s,%(lon)s&markers=%(lat)s,%(lon)s'\
+                          '&zoom=19&size=400x600&sensor=true&visual_refresh&scale=2&language=zh_cn' \
+                            % dict(lon=parking['location'][0], lat=parking['location'][1]),
                           )
 
 
