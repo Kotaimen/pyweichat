@@ -8,11 +8,14 @@ import ast
 
 from flask import Flask, request
 from flask.ext.cache import Cache
+from flask import render_template
 
 from pywc import *
 from wc_jtcx import *
+from parkinglot import *
+from highwaypanel import *
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", static_url_path='/static')
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 TOKEN = '123456'
@@ -21,7 +24,8 @@ TOKEN = '123456'
 @app.route('/')
 def root():
     return 'ok', 200
-    
+
+
 @app.route('/raytrace', methods=['GET', 'POST'])
 def weichatapp():
     try:
@@ -44,10 +48,39 @@ def weichatapp():
             return reply, 200, reply_header
         else:
             return 'Not Implemented', 501
-
-
     else:
         return 'Method Not Allowed', 405
+
+
+@app.route('/raytrace/parkinglot')
+def parkinglot():
+    lon = request.args.get('lon')
+    lat = request.args.get('lat')
+
+    if lon is None or lat is None:
+        return 'Bad Request', 400
+
+    location = float(lon), float(lat)
+    service = ParkingLotService()
+    parkinglots = service.fetch(location)
+
+    return render_template('parkinglot.html', parkinglots=parkinglots)
+
+
+@app.route('/raytrace/highwaypanel')
+def highwaypanel():
+    lon = request.args.get('lon')
+    lat = request.args.get('lat')
+
+    if lon is None or lat is None:
+        return 'Bad Request', 400
+    
+    location = float(lon), float(lat)
+    service = HighwayPanelService()
+    panels = service.fetch(location)
+
+    return render_template('highwaypanel.html', panels=panels)
+
 
 app.debug = True
 app.run(host='0.0.0.0')

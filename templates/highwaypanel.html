@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Parking Lot</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="http://libs.baidu.com/bootstrap/2.0.4/css/bootstrap.min.css" rel="stylesheet">
+
+<!--        <link href="/static/bootstrap/css/bootstrap.css" rel="stylesheet">
+        <link href="/static/bootstrap/css/bootstrap-responsive.css" rel="stylesheet"> -->
+    </head>
+    <body>
+	<div class="container-fluid" >
+	    <div class="row-fluid">
+                <div class="span12">
+                    <h1>周边高架信息</h1>
+                </div>
+            </div>         
+            {% for panel in panels  %}
+	    <div class="row-fluid">
+                <div class="span12">
+                     <div class="well" >
+                         <img src={{ panel.image_url }} width="320px" >
+                         <div class="caption">
+                             <h4>{{ panel.name }}</h4>
+                         </div>        
+                     </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <script src="http://libs.baidu.com/bootstrap/2.0.4/js/bootstrap.min.js"></script>
+<!--	<script src="/static/bootstrap/js/bootstrap.min.js"></script>  -->
+    </body>
+</html>

@@ -1,11 +1,9 @@
 # -*- encoding: utf-8 -*-
 
 """ Decode requests from http://jtcx.sh.cn (which uses mapabc api) """
-
+import math
 import json
 import unittest
-from pprint import pprint
-
 import requests
 
 KEYS = [[0, 2, 1, 2, 8, 9, 4, 1, 7, 2, 5, 3, 9],
@@ -187,30 +185,28 @@ def response2json(text):
     text = text.split('{', 1)
     data = json.loads('{' + text[1].strip()[:-1])
     return data
-        
-def fetch_panel_list(location):
-    """ Highway panel information 
-    
-    A GIF image just like those displayed on elevation highways
-    """
-    session = requests.Session()
-    response = session.get('http://sis.jtcx.sh.cn/sisserver?highLight=false'\
-                           '&srctype=USERPOI&eid=9070&extId=&agentId=&tempid=52&config=BESN'\
-                           '&searchName=&cityCode=021&searchType=&number=100&batch=1'\
-                           '&a_k=cb02363e90e02da4b5f3cc9dcc7f5cd0881012bd4ec0dbe0f2b5a87cea3602ad70431a4938633d15'\
-                           '&resType=JSON&enc=utf-8&sr=0&ctx=1&a_nocache=')
 
-    data = response2json(response.text)
-    
-    ret = list()
+def haversine_distance(lon1, lat1, lon2, lat2):
+    """ Distance(meter) between two lonlat, presuming the earth is a sphere """
 
-    for poi in data['poilist']:
-        ret.append(dict(name=poi['uxml']['INFORMATION'],
-                        image='http://vms.jtcx.sh.cn:8089/VmsPic/vms/%s.gif' % poi['uxml']['INTELLIGID'],
-                        location=(decode_lonlat(poi['x']), decode_lonlat(poi['y']))
-                   ))
-    return ret
+    sin_half_dLat = math.sin(math.radians(lat2 - lat1) / 2.)
+    sin_half_dLon = math.sin(math.radians(lon2 - lon1) / 2.)
 
+    cos_lat1 = math.cos(math.radians(lat1))
+    cos_lat2 = math.cos(math.radians(lat2))
+
+    a = sin_half_dLon * sin_half_dLon * cos_lat1 * cos_lat2 \
+            + sin_half_dLat * sin_half_dLat
+
+    # 12742000 = 1000 * 2 * 6371
+    return 12742000. * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def distance(lonlat1, lonlat2):
+    x1, y1 = lonlat1
+    x2, y2 = lonlat2
+#    return math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1))
+    return haversine_distance(x1, y1, x2, y2)
 
 def fetch_accident_list(location):
     """ Traffic accident report """
@@ -232,53 +228,8 @@ def fetch_accident_list(location):
                         location=(decode_lonlat(poi['x']), decode_lonlat(poi['y']))
                    ))
     return ret
-    
-def fetch_parking_list(location):
-    """ Parking space information 
-    
-    Note the offical site don't use location based query but their Mapabc 
-    provider supports actually supports it...
-    """
-    lonlat =(encode_lonlat(location[0]), encode_lonlat(location[1]))
-    print lonlat
-    session = requests.Session()    
-    response = session.get('http://sis.jtcx.sh.cn/sisserver?highLight=false'\
-                           '&srctype=USERPOI&eid=9070&extId=&agentId=&tempid=8&config=BESN'\
-                           '&cityCode=021&cenName=&searchType=&number=10&batch=1'\
-                           '&a_k=cb02363e90e02da4b5f3cc9dcc7f5cd0881012bd4ec0dbe0f2b5a87cea3602ad70431a4938633d15'\
-                           '&resType=JSON&enc=utf-8&sr=0&range=800&naviflag=0'\
-                           '&ctx=1&a_nocache=&cenX=%s&cenY=%s' \
-                           % lonlat                         
-                           )
-
-    data = response2json(response.text)
-
-    ret = list()
-
-    for poi in data['poilist']:
-        ret.append(dict(name=poi['name'],
-                        address=poi['address'],
-                        total=int(float(poi['uxml']['TOTAL_NUM'])),
-                        available=int(float(poi['uxml']['AVAILABLE_NUM'])),
-                        location=(decode_lonlat(poi['x']), decode_lonlat(poi['y']))
-                   ))
-    return ret
 
 
-class JTCXFetchTest(unittest.TestCase):
-
-#     def testFetchPanels(self):
-#         for panel in fetch_panel_list((121.49586, 31.24031)):
-#             pprint(panel)        
-#          
-#     def testFetchAccidents(self):
-#         for accident in fetch_accident_list((121.49586, 31.24031)):
-#             pprint(accident)
-
-
-    def testFetchPakinglots(self):
-        for parking in fetch_parking_list((121.458989, 31.22085)):
-            print parking['name'], parking['available']
-            
 if __name__ == '__main__':
     unittest.main()
+    
